@@ -3,9 +3,7 @@
 
 #include <iostream>
 #include <memory>
-#include <set>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "tpuv7_modelrt.h"
@@ -95,9 +93,6 @@ class BMNNNetwork : public NoCopyable {
   tpuRtTensor_t* m_inputTensors;
   tpuRtTensor_t* m_outputTensors;
   int m_max_batch;
-
-  std::unordered_map<std::string, tpuRtTensor_t*> m_mapInputs;
-  std::unordered_map<std::string, tpuRtTensor_t*> m_mapOutputs;
   tpuRtNet_t* net;
   tpuRtNetInfo_t* m_netinfo;
   tpuRtNetInfo_t info;
