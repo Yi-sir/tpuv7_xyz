@@ -9,6 +9,15 @@
 #include "tpuv7_modelrt.h"
 #include "tpuv7_rt.h"
 
+namespace {
+#define ASSERT(cond) \
+  do {               \
+    if (!cond) {     \
+      exit(1);       \
+    }                \
+  } while (false)
+}  // namespace
+
 /*
  * Any class that inherits this class cannot be assigned.
  */
@@ -61,7 +70,11 @@ class BMNNTensor {
         m_tensor(tensor),
         stream(stream) {}
 
-  virtual ~BMNNTensor() {}
+  virtual ~BMNNTensor() {
+    if (m_host_data) {
+      delete m_host_data;
+    }
+  }
 
   // Return an array pointer to system memory of tensor.
   void* get_host_data() {
@@ -125,7 +138,9 @@ class BMNNNetwork : public NoCopyable {
           max_size = out_size;
         }
       }
-      tpuRtMalloc(&m_outputTensors[i].data, max_size, 0);
+      auto ret = tpuRtMalloc(&m_outputTensors[i].data, max_size, 0);
+      ASSERT(ret == 0);
+      // assert()
     }
     showInfo();
   }
@@ -157,8 +172,7 @@ class BMNNNetwork : public NoCopyable {
   std::shared_ptr<BMNNTensor> outputTensor(int index, int stage_idx = -1) {
     if (stage_idx >= 0) {
       for (int i = 0; i < m_netinfo.output.num; ++i) {
-        m_outputTensors[i].shape =
-            m_netinfo.stages[stage_idx].output_shapes[i];
+        m_outputTensors[i].shape = m_netinfo.stages[stage_idx].output_shapes[i];
       }
     }
     return std::make_shared<BMNNTensor>(m_netinfo.output.names[index],
@@ -168,8 +182,8 @@ class BMNNNetwork : public NoCopyable {
 
   tpuRtStatus_t forward() {
     tpuRtStatus_t ret;
-    ret = tpuRtLaunchNet(net, m_inputTensors,
-                         m_outputTensors, m_netinfo.name, stream);
+    ret = tpuRtLaunchNet(net, m_inputTensors, m_outputTensors, m_netinfo.name,
+                         stream);
     return ret;
   }
 
@@ -233,8 +247,7 @@ class BMNNNetwork : public NoCopyable {
         auto shapeStr = shape_to_str(m_netinfo.stages[s].input_shapes[i]);
         printf("  Input %d) '%s' shape=%s dtype=%s scale=%g\n", i,
                m_netinfo.input.names[i], shapeStr.c_str(),
-               dtypeMap[m_netinfo.input.dtypes[i]],
-               m_netinfo.input.scales[i]);
+               dtypeMap[m_netinfo.input.dtypes[i]], m_netinfo.input.scales[i]);
       }
       for (int i = 0; i < m_netinfo.output.num; i++) {
         auto shapeStr = shape_to_str(m_netinfo.stages[s].output_shapes[i]);

@@ -10,16 +10,3 @@ int main() {
   auto tpu_net = tpu_ctx->network();
   return 0;
 }
-
-// int main() {
-//   const std::string modelPath =
-//       "/home/xyz/projects/1690/model_trans/YOLOv5/models/BM1690/"
-//       "yolov5s_v6.1_3output_int8_1b.bmodel";
-//   tpuRtNet_t net;
-//   tpuRtNetContext_t context;
-//   auto ret = tpuRtCreateNetContext(&context);
-//   ret = tpuRtLoadNet(modelPath.c_str(), context, &net);
-
-//   tpuRtUnloadNet(&net);
-//   return 0;
-// }
