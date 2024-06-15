@@ -1,11 +1,8 @@
-#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <numeric>
 
 #include "tpu_utils.h"
-
-using namespace std;
 
 float getDiff(char** outBuffer, char** groundTruth, std::vector<int>& dims) {
   float ret = 0.0;
@@ -25,12 +22,12 @@ float getDiff(char** outBuffer, char** groundTruth, std::vector<int>& dims) {
 }
 
 std::vector<int> dims{1632000 * 4, 408000 * 4, 102000 * 4};
+long inSize, outSize;
+char* inBuffer;
+char** outBuffer = new char*[3];
+char** fileOutBuffer = new char*[3];
 
-int main() {
-  long inSize, outSize;
-  char* inBuffer;
-  char** outBuffer = new char*[3];
-  char** fileOutBuffer = new char*[3];
+void prepareTensorsFromFile() {
   std::ifstream file1("../input_ref_data.dat.bmrt",
                       std::ios::binary | std::ios::ate);
   if (file1.is_open()) {
@@ -43,9 +40,6 @@ int main() {
   } else {
     std::cerr << "无法打开文件" << std::endl;
   }
-  outBuffer[0] = new char[dims[0]];
-  outBuffer[1] = new char[dims[1]];
-  outBuffer[2] = new char[dims[2]];
 
   std::ifstream file2("../output_ref_data.dat.bmrt",
                       std::ios::binary | std::ios::ate);
@@ -69,9 +63,15 @@ int main() {
     std::cerr << "无法打开文件" << std::endl;
   }
 
-  std::cout << inSize << std::endl << outSize << std::endl;
+  outBuffer[0] = new char[dims[0]];
+  outBuffer[1] = new char[dims[1]];
+  outBuffer[2] = new char[dims[2]];
 
-  const string modelPath =
+  return;
+}
+
+int main() {
+  const std::string modelPath =
       "/home/xyz/projects/1690/model_trans/YOLOv5/models/BM1690/"
       "yolov5s_v6.1_3output_int8_1b.bmodel";
   tpuRtStatus_t status;
@@ -88,11 +88,10 @@ int main() {
   status = tpuRtLoadNet(modelPath.c_str(), context, &net);
   info = tpuRtGetNetInfo(&net);
 
-  tpuRtTensor_t* input_tensor;
-  tpuRtTensor_t* output_tensor;
-  input_tensor = (tpuRtTensor_t*)malloc(sizeof(tpuRtTensor_t) * info.input.num);
-  output_tensor =
-      (tpuRtTensor_t*)malloc(sizeof(tpuRtTensor_t) * info.output.num);
+  tpuRtTensor_t* input_tensor = new tpuRtTensor_t[info.input.num];
+  tpuRtTensor_t* output_tensor = new tpuRtTensor_t[info.output.num];
+
+  prepareTensorsFromFile();
 
   for (int i = 0; i < info.input.num; i++) {
     input_tensor[i].dtype = info.input.dtypes[i];
@@ -123,23 +122,23 @@ int main() {
   }
 
   std::string outfilename = "../output.tpuRt";
-  std::ofstream of(outfilename, std::ios::binary | std::ios::ate | std::ios::out);
-  for(int i = 0; i < info.output.num; ++i) {
+  std::ofstream of(outfilename,
+                   std::ios::binary | std::ios::ate | std::ios::out);
+  for (int i = 0; i < info.output.num; ++i) {
     of.write(outBuffer[i], dims[i]);
   }
   of.close();
-
 
   auto diff = getDiff(outBuffer, fileOutBuffer, dims);
   std::cout << "diff is " << diff << std::endl;
 
   delete[] inBuffer;
+  for (int i = 0; i < info.output.num; ++i) delete[] outBuffer[i];
   delete[] outBuffer;
+  for (int i = 0; i < info.output.num; ++i) delete[] fileOutBuffer[i];
   delete[] fileOutBuffer;
-  free(input_tensor);
-  input_tensor = nullptr;
-  free(output_tensor);
-  output_tensor = nullptr;
+  delete[] input_tensor;
+  delete[] output_tensor;
 
   return 0;
 }
