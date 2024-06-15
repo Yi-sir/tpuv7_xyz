@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(tpuv7_test)
 
-set(CMAKE_CXX_FLAGS "-O3")
+# set(CMAKE_CXX_FLAGS "-O3")
 message("cur dir: ${PROJECT_SOURCE_DIR}")
 
 if (NOT DEFINED TARGET_ARCH)
@@ -28,7 +28,7 @@ if (${TARGET_ARCH} STREQUAL "pcie")
     include_directories(${TPUV7_INCLUDE_DIRS})
     link_directories(${TPUV7_LIB_DIRS})
 
-    add_executable(tpuv7_test main.cc bmnn_utils1690.h)
+    add_executable(tpuv7_test main.cc tpu_utils.h)
     target_link_libraries(tpuv7_test libtpuv7_rt.so libtpuv7_modelrt.so libbmodel.so)
 
 elseif (${TARGET_ARCH} STREQUAL "soc")
