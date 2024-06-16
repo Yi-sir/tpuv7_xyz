@@ -15,3 +15,4 @@ diff = abs(bmrt_array - tpurt_array)
 sum = diff.sum()
 
 print(sum)
+print(sum/len(bmrt_array))

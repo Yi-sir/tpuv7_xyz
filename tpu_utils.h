@@ -31,7 +31,7 @@ class NoCopyable {
 
 using tensorSizeType = unsigned long long;
 
-tensorSizeType getTensorBytes(const tpuRtTensor_t tensor) {
+tensorSizeType getTensorBytes(const tpuRtTensor_t& tensor) {
   // TODO: assert tensor!=nullptr
   tensorSizeType ret = 1;
   for (int i = 0; i < tensor.shape.num_dims; ++i) {
@@ -77,6 +77,9 @@ class BMNNTensor {
     }
   }
 
+  // tpuRtTensor_t& getTensor() { return *m_tensor; }
+  // const tpuRtTensor_t& getTensor() const { return *m_tensor; }
+
   // Return an array pointer to system memory of tensor.
   byte* get_host_data() {
     if (m_host_data) return m_host_data;
@@ -93,6 +96,8 @@ class BMNNTensor {
   tpuRtDataType_t get_dtype() { return m_tensor->dtype; }
 
   float get_scale() { return m_scale; }
+
+  // tpuRtTensor_t operator()() { return *m_tensor; }
 
  private:
   std::string m_name;
@@ -139,9 +144,8 @@ class BMNNNetwork : public NoCopyable {
           max_size = out_size;
         }
       }
-      auto ret = tpuRtMalloc(&m_outputTensors[i].data, max_size, 0);
-      ASSERT(ret == 0);
-      // assert()
+      // auto ret = tpuRtMalloc(&m_outputTensors[i].data, max_size, 0);
+      // ASSERT(ret == 0);
     }
     showInfo();
   }
@@ -157,10 +161,14 @@ class BMNNNetwork : public NoCopyable {
 
   int maxBatch() const { return m_max_batch; }
 
+  const tpuRtStream_t* getStream() const { return &stream; }
+  tpuRtStream_t* getStream() { return &stream; }
+
   std::shared_ptr<BMNNTensor> inputTensor(int index, int stage_idx = -1) {
     if (stage_idx >= 0) {
       for (int i = 0; i < m_netinfo.input.num; ++i) {
         m_inputTensors[i].shape = m_netinfo.stages[stage_idx].input_shapes[i];
+        m_inputTensors[i].dtype = m_netinfo.input.dtypes[i];
       }
     }
     return std::make_shared<BMNNTensor>(m_netinfo.input.names[index],
@@ -168,17 +176,35 @@ class BMNNNetwork : public NoCopyable {
                                         &m_inputTensors[index], &stream);
   }
 
-  int outputTensorNum() { return m_netinfo.output.num; }
+  std::shared_ptr<tpuRtTensor_t> inputTpuRtTensor(int index,
+                                                  int stage_idx = 0) {
+    auto ret = std::make_shared<tpuRtTensor_t>();
+    ret->shape = m_netinfo.stages[stage_idx].input_shapes[index];
+    ret->dtype = m_netinfo.input.dtypes[index];
+    return ret;
+  }
+
+  const int inputTensorNum() const { return m_netinfo.input.num; }
+  const int outputTensorNum() const { return m_netinfo.output.num; }
 
   std::shared_ptr<BMNNTensor> outputTensor(int index, int stage_idx = -1) {
     if (stage_idx >= 0) {
       for (int i = 0; i < m_netinfo.output.num; ++i) {
         m_outputTensors[i].shape = m_netinfo.stages[stage_idx].output_shapes[i];
+        m_outputTensors[i].dtype = m_netinfo.output.dtypes[i];
       }
     }
     return std::make_shared<BMNNTensor>(m_netinfo.output.names[index],
                                         m_netinfo.output.scales[index],
                                         &m_outputTensors[index], &stream);
+  }
+
+  std::shared_ptr<tpuRtTensor_t> outputTpuRtTensor(int index,
+                                                   int stage_idx = 0) {
+    auto ret = std::make_shared<tpuRtTensor_t>();
+    ret->shape = m_netinfo.stages[stage_idx].output_shapes[index];
+    ret->dtype = m_netinfo.output.dtypes[index];
+    return ret;
   }
 
   tpuRtStatus_t forward() {

@@ -4,6 +4,17 @@
 
 #include "tpu_utils.h"
 
+const std::string ref_in = "../data/1684x/input_int81b";
+const std::string ref_out = "../data/1684x/output_int81b";
+const std::string calc_out = "../data/1690/output_int81b";
+const std::string modelPath =
+    "/home/xyz/projects/1690/model_trans/YOLOv5/models/BM1690/"
+    "yolov5s_v6.1_3output_int8_1b.bmodel";
+
+char* inBuffer;
+char** outBuffer;
+char** fileOutBuffer;
+
 float getDiff(char** outBuffer, char** groundTruth, std::vector<int>& dims) {
   float ret = 0.0;
   float** outBufferFloat = reinterpret_cast<float**>(outBuffer);
@@ -21,31 +32,23 @@ float getDiff(char** outBuffer, char** groundTruth, std::vector<int>& dims) {
   return ret;
 }
 
-std::vector<int> dims{1632000 * 4, 408000 * 4, 102000 * 4};
-long inSize, outSize;
-char* inBuffer;
-char** outBuffer = new char*[3];
-char** fileOutBuffer = new char*[3];
-
-void prepareTensorsFromFile() {
-  std::ifstream file1("../input_ref_data.dat.bmrt",
-                      std::ios::binary | std::ios::ate);
+void prepareHostTensorsFromFile(const std::string& ref_in,
+                                const std::string& ref_out,
+                                std::vector<int>& dims) {
+  std::ifstream file1(ref_in, std::ios::binary | std::ios::ate);
   if (file1.is_open()) {
     std::streampos fileSize = file1.tellg();
     file1.seekg(0, std::ios::beg);
-    inSize = fileSize;
-    inBuffer = new char[inSize];
-    file1.read(inBuffer, inSize);
+    inBuffer = new char[int(fileSize)];
+    file1.read(inBuffer, int(fileSize));
     file1.close();
   } else {
     std::cerr << "无法打开文件" << std::endl;
   }
 
-  std::ifstream file2("../output_ref_data.dat.bmrt",
-                      std::ios::binary | std::ios::ate);
+  std::ifstream file2(ref_out, std::ios::binary | std::ios::ate);
   if (file2.is_open()) {
     std::streampos fileSize = file2.tellg();
-    outSize = fileSize;
 
     fileOutBuffer[0] = new char[dims[0]];
     fileOutBuffer[1] = new char[dims[1]];
@@ -53,9 +56,7 @@ void prepareTensorsFromFile() {
 
     file2.seekg(0, std::ios::beg);
     file2.read(fileOutBuffer[0], dims[0]);
-    // file2.seekg(dims[0], std::ios::beg);
     file2.read(fileOutBuffer[1], dims[1]);
-    // file2.seekg(dims[0] + dims[1], std::ios::beg);
     file2.read(fileOutBuffer[2], dims[2]);
 
     file2.close();
@@ -63,82 +64,71 @@ void prepareTensorsFromFile() {
     std::cerr << "无法打开文件" << std::endl;
   }
 
-  outBuffer[0] = new char[dims[0]];
-  outBuffer[1] = new char[dims[1]];
-  outBuffer[2] = new char[dims[2]];
+  // outBuffer[0] = new char[dims[0]];
+  // outBuffer[1] = new char[dims[1]];
+  // outBuffer[2] = new char[dims[2]];
 
   return;
 }
 
+void mallocAndCopyTpuRtTensors(
+    std::shared_ptr<BMNNNetwork> net,
+    std::vector<std::shared_ptr<tpuRtTensor_t>>& inputTensors,
+    std::vector<std::shared_ptr<tpuRtTensor_t>>& outputTensors,
+    char* inBuffer) {
+  for (int i = 0; i < net->inputTensorNum(); ++i) {
+    int size = getTensorBytes(*inputTensors[i]);
+    tpuRtMalloc(&(inputTensors[i]->data), size, 0);
+    tpuRtMemcpyS2D(inputTensors[i]->data, inBuffer, size);
+  }
+  for (int i = 0; i < net->outputTensorNum(); ++i) {
+    int size = getTensorBytes(*outputTensors[i]);
+    tpuRtMalloc(&(outputTensors[i]->data), size, 0);
+  }
+  return;
+}
+
 int main() {
-  const std::string modelPath =
-      "/home/xyz/projects/1690/model_trans/YOLOv5/models/BM1690/"
-      "yolov5s_v6.1_3output_int8_1b.bmodel";
-  tpuRtStatus_t status;
-  tpuRtStream_t stream;
-  // init device
   tpuRtInit();
   tpuRtSetDevice(0);
-  tpuRtNetContext_t context;
-  status = tpuRtCreateNetContext(&context);
-  tpuRtStreamCreate(&stream);
-  tpuRtNet_t net;
-  tpuRtNetInfo_t info;
-  // load bmodel
-  status = tpuRtLoadNet(modelPath.c_str(), context, &net);
-  info = tpuRtGetNetInfo(&net);
+  tpuRtStatus_t ret;
+  std::vector<int> dims;
+  long inSize, outSize;
+  auto context = std::make_shared<BMNNContext>(modelPath.c_str());
+  auto network = context->network();
+  outBuffer = new char*[network->outputTensorNum()];
+  fileOutBuffer = new char*[network->outputTensorNum()];
 
-  tpuRtTensor_t* input_tensor = new tpuRtTensor_t[info.input.num];
-  tpuRtTensor_t* output_tensor = new tpuRtTensor_t[info.output.num];
-
-  prepareTensorsFromFile();
-
-  for (int i = 0; i < info.input.num; i++) {
-    input_tensor[i].dtype = info.input.dtypes[i];
-    input_tensor[i].shape.num_dims = info.stages[0].input_shapes[i].num_dims;
-    for (int k = 0; k < info.stages[0].input_shapes[0].num_dims; ++k) {
-      input_tensor[i].shape.dims[k] = info.stages[0].input_shapes[i].dims[k];
-    }
-    int size = getTensorBytes(input_tensor[i]);
-    tpuRtMalloc(&input_tensor[i].data, size, 0);
-    tpuRtMemcpyS2D(input_tensor[i].data, inBuffer, size);
+  std::vector<std::shared_ptr<tpuRtTensor_t>> inputTensors(
+      network->inputTensorNum());
+  for (int i = 0; i < network->inputTensorNum(); ++i) {
+    inputTensors[i] = network->inputTpuRtTensor(i);
+  }
+  std::vector<std::shared_ptr<tpuRtTensor_t>> outputTensors(
+      network->outputTensorNum());
+  for (int i = 0; i < network->outputTensorNum(); ++i) {
+    outputTensors[i] = network->outputTpuRtTensor(i);
+    dims.push_back(getTensorBytes(*outputTensors[i]));
   }
 
-  for (int i = 0; i < info.output.num; i++) {
-    output_tensor[i].dtype = info.output.dtypes[i];
-    output_tensor[i].shape.num_dims = info.stages[0].output_shapes[i].num_dims;
-    for (int k = 0; k < info.stages[0].output_shapes[0].num_dims; ++k) {
-      output_tensor[i].shape.dims[k] = info.stages[0].output_shapes[i].dims[k];
-    }
-    int size = getTensorBytes(output_tensor[i]);
-    tpuRtMalloc(&output_tensor[i].data, size, 0);
-  }
-  status =
-      tpuRtLaunchNetAsync(&net, input_tensor, output_tensor, info.name, stream);
-  tpuRtStreamSynchronize(stream);
-  for (int i = 0; i < info.output.num; i++) {
-    tpuRtMemcpyD2S(outBuffer[i], output_tensor[i].data,
-                   getTensorBytes(output_tensor[i]));
-  }
+  prepareHostTensorsFromFile(ref_in, ref_out, dims);
+  mallocAndCopyTpuRtTensors(network, inputTensors, outputTensors, inBuffer);
 
-  std::string outfilename = "../output.tpuRt";
-  std::ofstream of(outfilename,
-                   std::ios::binary | std::ios::ate | std::ios::out);
-  for (int i = 0; i < info.output.num; ++i) {
-    of.write(outBuffer[i], dims[i]);
+  ret = network->forward(inputTensors, outputTensors);
+
+  std::vector<std::shared_ptr<BMNNTensor>> outputBMNNTensors;
+  for (int i = 0; i < network->outputTensorNum(); ++i) {
+    outputBMNNTensors.push_back(std::make_shared<BMNNTensor>(
+        "", 1.0, outputTensors[i].get(), network->getStream()));
+    outBuffer[i] = outputBMNNTensors[i]->get_host_data();
   }
-  of.close();
 
   auto diff = getDiff(outBuffer, fileOutBuffer, dims);
-  std::cout << "diff is " << diff << std::endl;
 
+  std::cout << "diff is " << diff << std::endl;
   delete[] inBuffer;
-  for (int i = 0; i < info.output.num; ++i) delete[] outBuffer[i];
-  delete[] outBuffer;
-  for (int i = 0; i < info.output.num; ++i) delete[] fileOutBuffer[i];
+  for (int i = 0; i < network->inputTensorNum(); ++i) delete[] fileOutBuffer[i];
   delete[] fileOutBuffer;
-  delete[] input_tensor;
-  delete[] output_tensor;
 
   return 0;
 }
