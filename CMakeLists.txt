@@ -29,7 +29,7 @@ if (${TARGET_ARCH} STREQUAL "pcie")
     link_directories(${TPUV7_LIB_DIRS})
 
     add_executable(tpuv7_test main.cc tpu_utils.h)
-    target_link_libraries(tpuv7_test libtpuv7_rt.so libtpuv7_modelrt.so libbmodel.so)
+    target_link_libraries(tpuv7_test tpuv7_rt tpuv7_modelrt)
 
 elseif (${TARGET_ARCH} STREQUAL "soc")
     
