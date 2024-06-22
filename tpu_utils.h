@@ -119,7 +119,7 @@ class BMNNNetwork : public NoCopyable {
 
  public:
   BMNNNetwork(tpuRtNet_t* netPtr) : net(netPtr) {
-    m_netinfo = tpuRtGetNetInfo(netPtr);
+    m_netinfo = tpuRtGetNetInfo(*netPtr);
     // m_netinfo = &info;
     tpuRtStreamCreate(&stream);
     m_inputTensors = new tpuRtTensor_t[m_netinfo.input.num];
@@ -307,7 +307,7 @@ class BMNNContext : public NoCopyable {
   }
 
   ~BMNNContext() {
-    tpuRtUnloadNet(&net);
+    tpuRtUnloadNet(net);
     // tpuRtDestroyNetContext(context);
   }
 

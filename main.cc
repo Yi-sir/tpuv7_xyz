@@ -2,7 +2,7 @@
 #include <iostream>
 #include <numeric>
 
-#include "tpu_utils.h"
+#include "post_process.cc"
 
 const std::string ref_in = "../data/1684x/input_int81b";
 const std::string ref_out = "../data/1684x/output_int81b";
@@ -122,7 +122,10 @@ int main() {
         "", 1.0, outputTensors[i].get(), network->getStream()));
     outBuffer[i] = outputBMNNTensors[i]->get_host_data();
   }
-
+  std::vector<std::shared_ptr<DetectedObjectMetadata>> detDatas = postProcessCPU(fileOutBuffer, outputBMNNTensors);
+  for(int i = 0; i < detDatas.size(); ++i) {
+    std::cout << detDatas[i]->mBox.mX << " " << detDatas[i]->mBox.mY << " " << detDatas[i]->mBox.mWidth << " " << detDatas[i]->mBox.mHeight << std::endl;
+  }
   auto diff = getDiff(outBuffer, fileOutBuffer, dims);
 
   std::cout << "diff is " << diff << std::endl;
