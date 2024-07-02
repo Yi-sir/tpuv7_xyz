@@ -122,9 +122,12 @@ int main() {
         "", 1.0, outputTensors[i].get(), network->getStream()));
     outBuffer[i] = outputBMNNTensors[i]->get_host_data();
   }
-  std::vector<std::shared_ptr<DetectedObjectMetadata>> detDatas = postProcessCPU(fileOutBuffer, outputBMNNTensors);
-  for(int i = 0; i < detDatas.size(); ++i) {
-    std::cout << detDatas[i]->mBox.mX << " " << detDatas[i]->mBox.mY << " " << detDatas[i]->mBox.mWidth << " " << detDatas[i]->mBox.mHeight << std::endl;
+  std::vector<std::shared_ptr<DetectedObjectMetadata>> detDatas =
+      postProcessCPU(fileOutBuffer, outputBMNNTensors);
+  for (int i = 0; i < detDatas.size(); ++i) {
+    std::cout << detDatas[i]->mBox.mX << " " << detDatas[i]->mBox.mY << " "
+              << detDatas[i]->mBox.mWidth << " " << detDatas[i]->mBox.mHeight
+              << std::endl;
   }
   auto diff = getDiff(outBuffer, fileOutBuffer, dims);
 
@@ -132,6 +135,12 @@ int main() {
   delete[] inBuffer;
   for (int i = 0; i < network->inputTensorNum(); ++i) delete[] fileOutBuffer[i];
   delete[] fileOutBuffer;
+
+  for (int i = 0; i < network->inputTensorNum(); ++i)
+    tpuRtFree(&inputTensors[i]->data, 0);
+
+  for (int i = 0; i < network->outputTensorNum(); ++i)
+    tpuRtFree(&outputTensors[i]->data, 0);
 
   return 0;
 }

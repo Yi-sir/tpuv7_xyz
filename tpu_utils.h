@@ -153,9 +153,9 @@ class BMNNNetwork : public NoCopyable {
   ~BMNNNetwork() {
     tpuRtStreamDestroy(stream);
     delete[] m_inputTensors;
-    for (int i = 0; i < m_netinfo.output.num; ++i) {
-      tpuRtFree(&m_outputTensors[i].data, 0);
-    }
+    // for (int i = 0; i < m_netinfo.output.num; ++i) {
+    //   tpuRtFree(&m_outputTensors[i].data, 0);
+    // }
     delete[] m_outputTensors;
   }
 
@@ -308,7 +308,7 @@ class BMNNContext : public NoCopyable {
 
   ~BMNNContext() {
     tpuRtUnloadNet(net);
-    // tpuRtDestroyNetContext(context);
+    tpuRtDestroyNetContext(context);
   }
 
   std::string network_name(int index) {
