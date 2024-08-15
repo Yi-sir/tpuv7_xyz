@@ -116,11 +116,13 @@ class BMNNNetwork : public NoCopyable {
   // tpuRtNetInfo_t* m_netinfo;
   tpuRtNetInfo_t m_netinfo;
   tpuRtStream_t stream;
+  char **net_names = NULL;
+  int net_number = 0;
 
  public:
   BMNNNetwork(tpuRtNet_t* netPtr) : net(netPtr) {
-    m_netinfo = tpuRtGetNetInfo(*netPtr);
-    // m_netinfo = &info;
+    net_number = tpuRtGetNetNames(*netPtr, &net_names);
+    m_netinfo = getInfo();
     tpuRtStreamCreate(&stream);
     m_inputTensors = new tpuRtTensor_t[m_netinfo.input.num];
     m_outputTensors = new tpuRtTensor_t[m_netinfo.output.num];
@@ -151,13 +153,15 @@ class BMNNNetwork : public NoCopyable {
   }
 
   ~BMNNNetwork() {
-    tpuRtStreamDestroy(stream);
-    delete[] m_inputTensors;
-    // for (int i = 0; i < m_netinfo.output.num; ++i) {
-    //   tpuRtFree(&m_outputTensors[i].data, 0);
-    // }
-    delete[] m_outputTensors;
+    // tpuRtStreamDestroy(stream);
+    
+    // tpuRtFreeNetNames(net_names);
   }
+
+  tpuRtNetInfo_t getInfo(int idx=0) {
+    return tpuRtGetNetInfo(*net, net_names[idx]);
+  }
+
 
   int maxBatch() const { return m_max_batch; }
 
@@ -209,7 +213,7 @@ class BMNNNetwork : public NoCopyable {
 
   tpuRtStatus_t forward() {
     tpuRtStatus_t ret;
-    ret = tpuRtLaunchNet(net, m_inputTensors, m_outputTensors, m_netinfo.name,
+    ret = tpuRtLaunchNet(*net, m_inputTensors, m_outputTensors, m_netinfo.name,
                          stream);
     return ret;
   }
@@ -225,14 +229,16 @@ class BMNNNetwork : public NoCopyable {
       tempOutputTensors[i] = *outputTensors[i];
 
     tpuRtStatus_t ret;
-    ret = tpuRtLaunchNet(const_cast<tpuRtNet_t*>(net), tempInputTensors,
+    ret = tpuRtLaunchNet(*net, tempInputTensors,
                          tempOutputTensors, m_netinfo.name, stream);
+    tpuRtFreeNetNames(net_names);
+    tpuRtStreamDestroy(stream);
     return ret;
   }
 
   tpuRtStatus_t forwardAsync() {
     tpuRtStatus_t ret;
-    ret = tpuRtLaunchNetAsync(const_cast<tpuRtNet_t*>(net), m_inputTensors,
+    ret = tpuRtLaunchNetAsync(*net, m_inputTensors,
                               m_outputTensors, m_netinfo.name, stream);
     return ret;
   }
@@ -248,7 +254,7 @@ class BMNNNetwork : public NoCopyable {
       tempOutputTensors[i] = *outputTensors[i];
 
     tpuRtStatus_t ret;
-    ret = tpuRtLaunchNetAsync(const_cast<tpuRtNet_t*>(net), tempInputTensors,
+    ret = tpuRtLaunchNetAsync(*net, tempInputTensors,
                               tempOutputTensors, m_netinfo.name, stream);
     return ret;
   }
@@ -308,7 +314,7 @@ class BMNNContext : public NoCopyable {
 
   ~BMNNContext() {
     tpuRtUnloadNet(net);
-    tpuRtDestroyNetContext(context);
+    // tpuRtDestroyNetContext(context);
   }
 
   std::string network_name(int index) {
