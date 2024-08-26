@@ -153,9 +153,9 @@ class BMNNNetwork : public NoCopyable {
   }
 
   ~BMNNNetwork() {
-    // tpuRtStreamDestroy(stream);
+    tpuRtStreamDestroy(stream);
     
-    // tpuRtFreeNetNames(net_names);
+    tpuRtFreeNetNames(net_names);
   }
 
   tpuRtNetInfo_t getInfo(int idx=0) {
@@ -231,8 +231,8 @@ class BMNNNetwork : public NoCopyable {
     tpuRtStatus_t ret;
     ret = tpuRtLaunchNet(*net, tempInputTensors,
                          tempOutputTensors, m_netinfo.name, stream);
-    tpuRtFreeNetNames(net_names);
-    tpuRtStreamDestroy(stream);
+    // tpuRtFreeNetNames(net_names);
+    // tpuRtStreamDestroy(stream);
     return ret;
   }
 
@@ -314,7 +314,7 @@ class BMNNContext : public NoCopyable {
 
   ~BMNNContext() {
     tpuRtUnloadNet(net);
-    // tpuRtDestroyNetContext(context);
+    tpuRtDestroyNetContext(context);
   }
 
   std::string network_name(int index) {

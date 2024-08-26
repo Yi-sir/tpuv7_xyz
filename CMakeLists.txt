@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(tpuv7_test)
 
-# set(CMAKE_CXX_FLAGS "-O3")
+# set(CMAKE_CXX_FLAGS "-O0")
 message("cur dir: ${PROJECT_SOURCE_DIR}")
 
 if (NOT DEFINED TARGET_ARCH)

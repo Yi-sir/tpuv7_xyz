@@ -125,14 +125,14 @@ int main() {
   }
   std::vector<std::shared_ptr<DetectedObjectMetadata>> detDatas =
       postProcessCPU(fileOutBuffer, outputBMNNTensors);
-  // for (int i = 0; i < detDatas.size(); ++i) {
-  //   std::cout << detDatas[i]->mBox.mX << " " << detDatas[i]->mBox.mY << " "
-  //             << detDatas[i]->mBox.mWidth << " " << detDatas[i]->mBox.mHeight
-  //             << std::endl;
-  // }
-  // auto diff = getDiff(outBuffer, fileOutBuffer, dims);
+  for (int i = 0; i < detDatas.size(); ++i) {
+      std::cout << detDatas[i]->mBox.mX << " " << detDatas[i]->mBox.mY << " "
+              << detDatas[i]->mBox.mWidth << " " << detDatas[i]->mBox.mHeight
+              << std::endl;
+  }
+  auto diff = getDiff(outBuffer, fileOutBuffer, dims);
 
-  // std::cout << "diff is " << diff << std::endl;
+  std::cout << "diff is " << diff << std::endl;
   delete[] inBuffer;
   for (int i = 0; i < network->inputTensorNum(); ++i) delete[] fileOutBuffer[i];
   delete[] fileOutBuffer;
